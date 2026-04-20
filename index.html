@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portale Smart Working</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #3b82f6; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen font-sans text-slate-800">
+
+    <!-- Schermata di Login -->
+    <div id="login-view" class="fixed inset-0 flex items-center justify-center bg-slate-50 z-50">
+        <div class="bg-white p-8 rounded-2xl shadow-lg max-w-md w-full border border-slate-100">
+            <div class="text-center mb-8">
+                <div class="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="building-2" class="w-8 h-8 text-blue-600"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-slate-900">Accesso Smart Working</h1>
+                <p class="text-slate-500 mt-2 text-sm">Inserisci le tue credenziali per gestire le prenotazioni.</p>
+            </div>
+            
+            <div id="login-error" class="hidden mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm border border-red-200"></div>
+
+            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-5">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Nome e Cognome</label>
+                    <input type="text" id="username" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="Es: Enea Giuseppe">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                    <input type="password" id="password" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="••••">
+                </div>
+                <button type="submit" id="login-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors flex justify-center items-center gap-2">
+                    <span>Accedi</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Schermata Principale Calendario -->
+    <div id="app-view" class="hidden">
+        <!-- Navbar -->
+        <nav class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16 items-center">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="calendar-check" class="text-blue-600 h-6 w-6"></i>
+                        <span class="font-bold text-xl text-slate-900 hidden sm:block">SW Dashboard</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="text-right">
+                            <div id="user-name-display" class="font-semibold text-sm text-slate-900">Nome</div>
+                            <div id="user-floor-display" class="text-xs text-slate-500">Piano</div>
+                        </div>
+                        <button onclick="logout()" class="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors" title="Esci">
+                            <i data-lucide="log-out" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            
+            <!-- Alert per messaggi -->
+            <div id="alert-box" class="hidden mb-6 p-4 rounded-xl border text-sm flex items-start justify-between gap-4 transition-all">
+                <div id="alert-message" class="flex-1">Messaggio</div>
+                <button onclick="closeAlert()" class="opacity-50 hover:opacity-100"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+
+            <!-- Controlli Mese -->
+            <div class="bg-white rounded-t-2xl shadow-sm border border-slate-200 p-4 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <h2 class="text-2xl font-bold text-slate-800 capitalize" id="month-year-display">Mese Anno</h2>
+                    <div id="loading-indicator" class="hidden loader"></div>
+                </div>
+                <div class="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
+                    <button onclick="changeMonth(-1)" class="p-2 hover:bg-white rounded-lg transition-colors focus:outline-none text-slate-600 shadow-sm">
+                        <i data-lucide="chevron-left" class="w-5 h-5"></i>
+                    </button>
+                    <button onclick="resetToToday()" class="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white rounded-lg transition-colors shadow-sm">
+                        Oggi
+                    </button>
+                    <button onclick="changeMonth(1)" class="p-2 hover:bg-white rounded-lg transition-colors focus:outline-none text-slate-600 shadow-sm">
+                        <i data-lucide="chevron-right" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Info Piano Corrente -->
+            <div class="bg-slate-50 border-x border-b border-slate-200 p-3 text-sm text-slate-600 flex justify-between items-center">
+                <span>Capienza massima <b id="floor-name-info"></b>: <b id="floor-limit-info" class="text-blue-600"></b> posti/giorno (30%)</span>
+                <button onclick="fetchData()" class="flex items-center gap-1 text-blue-600 hover:text-blue-800" title="Aggiorna dati">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <!-- Griglia Calendario -->
+            <div class="bg-white shadow-sm border-x border-b border-slate-200 rounded-b-2xl overflow-hidden">
+                <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
+                    <div class="py-3 text-center text-xs font-semibold text-slate-500 uppercase">Lun</div>
+                    <div class="py-3 text-center text-xs font-semibold text-slate-500 uppercase">Mar</div>
+                    <div class="py-3 text-center text-xs font-semibold text-slate-500 uppercase">Mer</div>
+                    <div class="py-3 text-center text-xs font-semibold text-slate-500 uppercase">Gio</div>
+                    <div class="py-3 text-center text-xs font-semibold text-slate-500 uppercase">Ven</div>
+                    <div class="py-3 text-center text-xs font-semibold text-red-400 uppercase">Sab</div>
+                    <div class="py-3 text-center text-xs font-semibold text-red-400 uppercase">Dom</div>
+                </div>
+                <div id="calendar-grid" class="grid grid-cols-7 auto-rows-[140px] sm:auto-rows-[160px] bg-slate-200 gap-px">
+                    <!-- Generato da JS -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Conferma Prenotazione/Cancellazione -->
+    <div id="action-modal" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+            <h3 id="modal-title" class="text-lg font-bold text-slate-900 mb-2">Titolo</h3>
+            <p id="modal-desc" class="text-slate-500 text-sm mb-6">Descrizione</p>
+            <div class="flex gap-3 justify-end">
+                <button onclick="closeModal()" class="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">Annulla</button>
+                <button id="modal-confirm-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">Conferma</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // ---------------------------------------------------------
+        // L'URL DELLA TUA APP SCRIPT È STATO INSERITO QUI:
+        // ---------------------------------------------------------
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxxWGo33SrlOUEpWO20ru25X5QNLOE3pQKfoVZDDFeNF-cL1b1ro1TAAozzyMjUoF9h/exec';
+
+        let currentUser = null;
+        let currentDate = new Date();
+        let appData = { bookings: [], floorStats: {} };
+        let isLoading = false;
+        let actionTargetDate = null;
+
+        // Inizializzazione
+        function init() {
+            const savedUser = localStorage.getItem('swUser');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                showApp();
+                fetchData();
+            }
+        }
+
+        // --- SISTEMA DI LOGIN ---
+        async function handleLogin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('login-btn');
+            const errorDiv = document.getElementById('login-error');
+            const name = document.getElementById('username').value;
+            const pwd = document.getElementById('password').value;
+
+            btn.innerHTML = '<div class="loader border-white border-top-transparent"></div> Accesso...';
+            btn.disabled = true;
+            errorDiv.classList.add('hidden');
+
+            try {
+                const res = await callAPI({ action: 'login', name: name, password: pwd });
+                if (res.success) {
+                    currentUser = res.data;
+                    localStorage.setItem('swUser', JSON.stringify(currentUser));
+                    showApp();
+                    fetchData();
+                } else {
+                    throw new Error(res.error);
+                }
+            } catch (err) {
+                errorDiv.textContent = err.message || "Errore di connessione.";
+                errorDiv.classList.remove('hidden');
+            } finally {
+                btn.innerHTML = '<span>Accedi</span>';
+                btn.disabled = false;
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('swUser');
+            currentUser = null;
+            document.getElementById('app-view').classList.add('hidden');
+            document.getElementById('login-view').classList.replace('hidden', 'flex');
+            document.getElementById('login-form').reset();
+        }
+
+        function showApp() {
+            document.getElementById('login-view').classList.replace('flex', 'hidden');
+            document.getElementById('app-view').classList.remove('hidden');
+            document.getElementById('user-name-display').textContent = currentUser.name;
+            document.getElementById('user-floor-display').textContent = currentUser.floor;
+            document.getElementById('floor-name-info').textContent = currentUser.floor;
+        }
+
+        // --- GESTIONE DATI E API ---
+        async function callAPI(payload) {
+            const response = await fetch(SCRIPT_URL, {
+                method: 'POST',
+                // text/plain aggira i blocchi CORS di default dei browser verso le webapp Google
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload)
+            });
+            return await response.json();
+        }
+
+        async function fetchData() {
+            setLoading(true);
+            try {
+                const res = await callAPI({ action: 'getData' });
+                if (res.success) {
+                    appData = res.data;
+                    
+                    // Assicuriamoci che i dati esistano prima di elaborarli
+                    if(appData.bookings) {
+                        // Formatta la data (Da "2026-04-16T22:00:00.000Z" a "2026-04-16")
+                        appData.bookings = appData.bookings.map(b => {
+                            // Se Sheets manda un oggetto Data, lo trasformiamo in YYYY-MM-DD
+                            let cleanDate = String(b.date);
+                            if(cleanDate.includes('T')) {
+                                cleanDate = cleanDate.substring(0, 10);
+                            }
+                            return { ...b, date: cleanDate };
+                        });
+                    } else {
+                        appData.bookings = [];
+                    }
+                    
+                    document.getElementById('floor-limit-info').textContent = appData.floorStats[currentUser.floor]?.limit || 0;
+                    renderCalendar();
+                } else {
+                    showAlert("Errore caricamento: " + res.error, "error");
+                }
+            } catch (err) {
+                showAlert("Errore di rete durante l'aggiornamento.", "error");
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // --- AZIONI PRENOTAZIONE ---
+        function promptBooking(dateStr) {
+            actionTargetDate = dateStr;
+            const formattedDate = dateStr.split('-').reverse().join('/');
+            
+            document.getElementById('modal-title').textContent = "Prenota Smart Working";
+            document.getElementById('modal-desc').innerHTML = `Vuoi confermare la prenotazione per il giorno <b>${formattedDate}</b>?`;
+            
+            const btn = document.getElementById('modal-confirm-btn');
+            btn.className = "px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors";
+            btn.textContent = "Conferma Prenotazione";
+            btn.onclick = executeBooking;
+            
+            document.getElementById('action-modal').classList.replace('hidden', 'flex');
+        }
+
+        function promptCancel(dateStr) {
+            actionTargetDate = dateStr;
+            const formattedDate = dateStr.split('-').reverse().join('/');
+            
+            document.getElementById('modal-title').textContent = "Cancella Prenotazione";
+            document.getElementById('modal-desc').innerHTML = `Vuoi cancellare la tua prenotazione del <b>${formattedDate}</b>?`;
+            
+            const btn = document.getElementById('modal-confirm-btn');
+            btn.className = "px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors";
+            btn.textContent = "Cancella";
+            btn.onclick = executeCancel;
+            
+            document.getElementById('action-modal').classList.replace('hidden', 'flex');
+        }
+
+        function closeModal() {
+            document.getElementById('action-modal').classList.replace('flex', 'hidden');
+            actionTargetDate = null;
+        }
+
+        async function executeBooking() {
+            closeModal();
+            setLoading(true);
+            try {
+                const res = await callAPI({ action: 'book', userId: currentUser.id, date: actionTargetDate });
+                if (res.success) {
+                    showAlert("Prenotazione confermata con successo!", "success");
+                    await fetchData(); // Ricarica i dati per aggiornare i conteggi
+                } else {
+                    showAlert(res.error, "error"); // Mostra ad es. "Hai già 2 venerdì"
+                }
+            } catch (err) {
+                showAlert(err.message || "Errore di connessione.", "error");
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function executeCancel() {
+            closeModal();
+            setLoading(true);
+            try {
+                const res = await callAPI({ action: 'delete', userId: currentUser.id, date: actionTargetDate });
+                if (res.success) {
+                    showAlert("Prenotazione cancellata.", "success");
+                    await fetchData();
+                } else {
+                    showAlert(res.error, "error");
+                }
+            } catch (err) {
+                showAlert("Errore di connessione.", "error");
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // --- CALCOLO FESTIVITA' E WEEKEND ---
+        function getPasquetta(year) {
+            const f = Math.floor, G = year % 19, C = f(year / 100);
+            const H = (C - f(C / 4) - f((8 * C + 13) / 25) + 19 * G + 15) % 30;
+            const I = H - f(H / 28) * (1 - f(29 / (H + 1)) * f((21 - G) / 11));
+            const J = (year + f(year / 4) + I + 2 - C + f(C / 4)) % 7;
+            const L = I - J, month = 3 + f((L + 40) / 44), day = L + 28 - 31 * f(month / 4);
+            const easter = new Date(year, month - 1, day);
+            easter.setDate(easter.getDate() + 1); // Aggiunge 1 giorno per Pasquetta
+            return `${year}-${String(easter.getMonth() + 1).padStart(2, '0')}-${String(easter.getDate()).padStart(2, '0')}`;
+        }
+
+        function isHolidayOrWeekend(dateStr) {
+            const date = new Date(dateStr);
+            const day = date.getDay();
+            if (day === 0 || day === 6) return { is: true, type: 'weekend' }; // 0 = Domenica, 6 = Sabato
+
+            const mmdd = dateStr.substring(5);
+            // Principali festività italiane
+            const festeFisse = ['01-01', '01-06', '04-25', '05-01', '06-02', '08-15', '11-01', '12-08', '12-25', '12-26'];
+            if (festeFisse.includes(mmdd)) return { is: true, type: 'festivita' };
+            if (dateStr === getPasquetta(date.getFullYear())) return { is: true, type: 'festivita' };
+
+            return { is: false, type: '' };
+        }
+
+        // --- RENDERIZZAZIONE CALENDARIO ---
+        function changeMonth(delta) {
+            currentDate.setMonth(currentDate.getMonth() + delta);
+            renderCalendar();
+        }
+
+        function resetToToday() {
+            currentDate = new Date();
+            renderCalendar();
+        }
+
+        function renderCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+
+            const monthNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+            document.getElementById('month-year-display').textContent = `${monthNames[month]} ${year}`;
+
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '';
+
+            const firstDayOfMonth = new Date(year, month, 1);
+            const lastDayOfMonth = new Date(year, month + 1, 0);
+            
+            let startDayOfWeek = firstDayOfMonth.getDay();
+            startDayOfWeek = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1; // Lunedì come giorno 0
+
+            const totalDays = lastDayOfMonth.getDate();
+            const todayStr = new Date().toISOString().substring(0,10);
+            const limit = appData.floorStats[currentUser.floor]?.limit || 999;
+
+            // Spazi vuoti prima del primo giorno del mese
+            for (let i = 0; i < startDayOfWeek; i++) {
+                grid.innerHTML += `<div class="bg-white/40 p-2 pointer-events-none"></div>`;
+            }
+
+            // Generazione dei giorni
+            for (let day = 1; day <= totalDays; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const isPast = dateStr < todayStr;
+                const isToday = dateStr === todayStr;
+                const holidayCheck = isHolidayOrWeekend(dateStr);
+                
+                const dayBookings = appData.bookings.filter(b => b.date === dateStr);
+                const myBooking = dayBookings.find(b => String(b.userId) === String(currentUser.id));
+                const floorBookings = dayBookings.filter(b => b.floor === currentUser.floor).length;
+                
+                const isFloorFull = floorBookings >= limit;
+
+                // Colori delle celle
+                let cellClass = "bg-white p-2 flex flex-col relative transition-colors group ";
+                if (holidayCheck.is) cellClass += "bg-red-50/50 ";
+                else if (isPast && !myBooking) cellClass += "bg-slate-50 opacity-60 ";
+                else cellClass += "hover:bg-blue-50/30 ";
+
+                const dayNumClass = isToday 
+                    ? "w-7 h-7 flex items-center justify-center bg-blue-600 text-white font-bold rounded-full text-sm shrink-0" 
+                    : `text-sm font-medium ${holidayCheck.is ? 'text-red-400' : 'text-slate-700'} shrink-0 pl-1`;
+
+                const cell = document.createElement('div');
+                cell.className = cellClass;
+                
+                // Intestazione cella (Numero giorno + contatore posti)
+                let html = `
+                    <div class="flex justify-between items-start mb-1">
+                        <div class="${dayNumClass}">${day}</div>
+                        ${!holidayCheck.is && floorBookings > 0 ? `<div class="text-[10px] px-1.5 py-0.5 rounded-full ${isFloorFull ? 'bg-orange-100 text-orange-700 font-bold' : 'bg-slate-100 text-slate-500'}">${floorBookings}/${limit} ${currentUser.floor}</div>` : ''}
+                    </div>
+                    <div class="flex-1 overflow-y-auto scrollbar-hide space-y-1">
+                `;
+
+                // Badge persone prenotate
+                dayBookings.forEach(b => {
+                    const isMe = String(b.userId) === String(currentUser.id);
+                    let badgeClass = "bg-slate-100 text-slate-700 border-slate-200";
+                    if(b.floor === "Architettura") badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                    if(b.floor === "Interior Design") badgeClass = "bg-purple-50 text-purple-700 border-purple-200";
+                    if(b.floor === "New Space") badgeClass = "bg-amber-50 text-amber-700 border-amber-200";
+                    if(isMe) badgeClass = "bg-blue-600 text-white border-blue-700 font-bold shadow-sm"; 
+
+                    html += `
+                        <div class="text-[11px] px-1.5 py-1 rounded border ${badgeClass} truncate flex items-center gap-1 leading-none" title="${b.name} (${b.floor})">
+                            <i data-lucide="${isMe ? 'user-check' : 'user'}" class="w-3 h-3 shrink-0"></i>
+                            <span class="truncate">${b.name.split(' ')[0]} ${b.name.split(' ').length > 1 ? b.name.split(' ')[1][0]+'.' : ''}</span>
+                        </div>
+                    `;
+                });
+
+                html += `</div>`;
+
+                // Bottoni interattivi (mostrati all'hover del mouse)
+                if (!isPast && !holidayCheck.is) {
+                    if (myBooking) {
+                        html += `
+                            <div class="absolute inset-0 bg-white/80 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onclick="promptCancel('${dateStr}')">
+                                <button class="bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-red-200 shadow-sm flex items-center gap-1">
+                                    <i data-lucide="x-circle" class="w-3 h-3"></i> Rimuovi
+                                </button>
+                            </div>`;
+                    } else if (!isFloorFull) {
+                        html += `
+                            <div class="absolute inset-0 bg-white/80 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onclick="promptBooking('${dateStr}')">
+                                <button class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-blue-200 shadow-sm flex items-center gap-1">
+                                    <i data-lucide="plus-circle" class="w-3 h-3"></i> Prenota
+                                </button>
+                            </div>`;
+                    } else {
+                        html += `
+                            <div class="absolute inset-0 bg-white/80 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <span class="bg-orange-100 text-orange-700 text-[10px] font-bold px-2 py-1 rounded border border-orange-200 text-center">
+                                    Piano Saturo
+                                </span>
+                            </div>`;
+                    }
+                }
+
+                cell.innerHTML = html;
+                grid.appendChild(cell);
+            }
+            lucide.createIcons();
+        }
+
+        // --- UTILS PER NOTIFICHE ---
+        function setLoading(state) {
+            isLoading = state;
+            document.getElementById('loading-indicator').style.display = state ? 'block' : 'none';
+        }
+
+        function showAlert(message, type) {
+            const box = document.getElementById('alert-box');
+            const msg = document.getElementById('alert-message');
+            
+            box.className = `mb-6 p-4 rounded-xl border text-sm flex items-start justify-between gap-4 transition-all ${
+                type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
+            }`;
+            msg.innerHTML = `<strong>${type === 'success' ? 'Operazione riuscita!' : 'Attenzione!'}</strong><br>${message}`;
+            box.classList.remove('hidden');
+            
+            setTimeout(() => { closeAlert(); }, 5000); // Scompare da solo dopo 5 secondi
+        }
+
+        function closeAlert() {
+            document.getElementById('alert-box').classList.add('hidden');
+        }
+
+        // Fai partire l'app!
+        init();
+    </script>
+</body>
+</html>
