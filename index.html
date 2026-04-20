@@ -223,8 +223,22 @@
                     // Assicuriamoci che i dati esistano prima di elaborarli
                     if(appData.bookings) {
                         appData.bookings = appData.bookings.map(b => {
-                            // Ora il backend ci manda sempre e solo YYYY-MM-DD in modo pulito!
-                            return { ...b, date: String(b.date) };
+                            let cleanDate = String(b.date);
+                            
+                            // TRADUTTORE DATE: Se la data dal foglio arriva in formato GG/MM/AAAA, 
+                            // il sito la capovolge in AAAA-MM-GG per potersi "disegnare" nel calendario.
+                            if(cleanDate.includes('/')) {
+                                const parts = cleanDate.split('/');
+                                if(parts.length === 3 && parts[2].length === 4) {
+                                    cleanDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                                }
+                            } else if(cleanDate.includes('T')) {
+                                // Caso di emergenza: se arriva col fuso orario attaccato
+                                const d = new Date(cleanDate);
+                                cleanDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                            }
+                            
+                            return { ...b, date: cleanDate };
                         });
                     } else {
                         appData.bookings = [];
