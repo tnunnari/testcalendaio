@@ -222,12 +222,13 @@
                     
                     // Assicuriamoci che i dati esistano prima di elaborarli
                     if(appData.bookings) {
-                        // Formatta la data (Da "2026-04-16T22:00:00.000Z" a "2026-04-16")
+                        // FIX: Calcolo perfetto della data basato sul fuso orario corretto
                         appData.bookings = appData.bookings.map(b => {
-                            // Se Sheets manda un oggetto Data, lo trasformiamo in YYYY-MM-DD
                             let cleanDate = String(b.date);
                             if(cleanDate.includes('T')) {
-                                cleanDate = cleanDate.substring(0, 10);
+                                const d = new Date(cleanDate);
+                                // Genera la data usando l'anno, mese e giorno interpretato localmente
+                                cleanDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                             }
                             return { ...b, date: cleanDate };
                         });
