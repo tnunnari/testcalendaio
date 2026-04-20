@@ -225,20 +225,22 @@
                         appData.bookings = appData.bookings.map(b => {
                             let cleanDate = String(b.date);
                             
-                            // TRADUTTORE DATE: Se la data dal foglio arriva in formato GG/MM/AAAA, 
-                            // il sito la capovolge in AAAA-MM-GG per potersi "disegnare" nel calendario.
+                            // IL SEGRETO ANTIPROIETTILE: Salviamo la data ESATTA così come ce la manda il server
+                            const originalBackendDate = cleanDate; 
+                            
+                            // TRADUTTORE DATE: Adatta la data solo per farla vedere graficamente nel calendario
                             if(cleanDate.includes('/')) {
                                 const parts = cleanDate.split('/');
                                 if(parts.length === 3 && parts[2].length === 4) {
                                     cleanDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
                                 }
                             } else if(cleanDate.includes('T')) {
-                                // Caso di emergenza: se arriva col fuso orario attaccato
                                 const d = new Date(cleanDate);
                                 cleanDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                             }
                             
-                            return { ...b, date: cleanDate };
+                            // Aggiungiamo _exactBackendDate alla memoria della prenotazione
+                            return { ...b, date: cleanDate, _exactBackendDate: originalBackendDate };
                         });
                     } else {
                         appData.bookings = [];
@@ -267,7 +269,6 @@
             btn.className = "px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors";
             btn.textContent = "Conferma Prenotazione";
             
-            // Passiamo la data direttamente alla funzione invece di usare variabili globali
             btn.onclick = function() { executeBooking(dateStr); };
             
             document.getElementById('action-modal').classList.replace('hidden', 'flex');
@@ -283,8 +284,12 @@
             btn.className = "px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors";
             btn.textContent = "Cancella";
             
-            // Passiamo semplicemente la data
-            btn.onclick = function() { executeCancel(dateStr); };
+            // TROVA LA PRENOTAZIONE ESATTA: peschiamo la data magica salvata prima
+            const myBooking = appData.bookings.find(b => String(b.userId) === String(currentUser.id) && b.date === dateStr);
+            const targetBackendDate = myBooking ? myBooking._exactBackendDate : dateStr;
+            
+            // Rimandiamo al server la sua stessa medicina
+            btn.onclick = function() { executeCancel(targetBackendDate); };
             
             document.getElementById('action-modal').classList.replace('hidden', 'flex');
         }
