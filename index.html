@@ -225,12 +225,14 @@
                         // FIX: Calcolo perfetto della data basato sul fuso orario corretto
                         appData.bookings = appData.bookings.map(b => {
                             let cleanDate = String(b.date);
+                            let deleteTarget = cleanDate; // Nuovo: teniamo in memoria la data esatta per il server
                             if(cleanDate.includes('T')) {
                                 const d = new Date(cleanDate);
                                 // Genera la data usando l'anno, mese e giorno interpretato localmente
                                 cleanDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                                deleteTarget = String(b.date).substring(0, 10); // Estrae il giorno esatto nascosto nel server
                             }
-                            return { ...b, date: cleanDate };
+                            return { ...b, date: cleanDate, _deleteTarget: deleteTarget };
                         });
                     } else {
                         appData.bookings = [];
@@ -265,7 +267,7 @@
             document.getElementById('action-modal').classList.replace('hidden', 'flex');
         }
 
-        function promptCancel(dateStr) {
+        function promptCancel(dateStr, deleteTarget) {
             const formattedDate = dateStr.split('-').reverse().join('/');
             
             document.getElementById('modal-title').textContent = "Cancella Prenotazione";
@@ -275,8 +277,9 @@
             btn.className = "px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors";
             btn.textContent = "Cancella";
             
-            // Passiamo la data direttamente alla funzione
-            btn.onclick = function() { executeCancel(dateStr); };
+            // Passiamo al server ESATTAMENTE la data "nascosta" che si aspetta lui
+            const serverDate = deleteTarget || dateStr;
+            btn.onclick = function() { executeCancel(serverDate); };
             
             document.getElementById('action-modal').classList.replace('hidden', 'flex');
         }
@@ -441,7 +444,7 @@
                 if (!isPast && !holidayCheck.is) {
                     if (myBooking) {
                         html += `
-                            <div class="absolute inset-0 bg-white/80 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onclick="promptCancel('${dateStr}')">
+                            <div class="absolute inset-0 bg-white/80 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onclick="promptCancel('${dateStr}', '${myBooking._deleteTarget}')">
                                 <button class="bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-red-200 shadow-sm flex items-center gap-1">
                                     <i data-lucide="x-circle" class="w-3 h-3"></i> Rimuovi
                                 </button>
