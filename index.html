@@ -3,510 +3,684 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portale Smart Working</title>
+    <title>Studio Smart Booking | Portale Dipendenti</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #3b82f6; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .toast-enter { animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translate(-50%, -100%) scale(0.9); }
+            to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+        }
+        .modal-backdrop { background-color: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); }
+        .scale-up { animation: scaleUp 0.2s ease-out forwards; }
+        @keyframes scaleUp {
+            from { transform: scale(0.95); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen font-sans text-slate-800">
+<body class="bg-slate-50 font-sans text-slate-800 min-h-screen flex flex-col selection:bg-indigo-200 selection:text-indigo-900">
+    
+    <!-- Contenitore Principale che cambierà dinamicamente (Login / Dashboard / Board) -->
+    <div id="app" class="w-full min-h-screen flex flex-col transition-all duration-300"></div>
+    
+    <!-- Contenitore Notifiche -->
+    <div id="notification-container" class="fixed top-6 left-1/2 transform -translate-x-1/2 z-[100] pointer-events-none flex flex-col gap-2 w-[90%] max-w-md"></div>
 
-    <!-- Schermata di Login -->
-    <div id="login-view" class="fixed inset-0 flex items-center justify-center bg-slate-50 z-50">
-        <div class="bg-white p-8 rounded-2xl shadow-lg max-w-md w-full border border-slate-100">
-            <div class="text-center mb-8">
-                <div class="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i data-lucide="building-2" class="w-8 h-8 text-blue-600"></i>
+    <!-- Modal Conferma Azioni (Statico, nascosto di default) -->
+    <div id="action-modal" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50 p-4 transition-opacity">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden border border-slate-200 scale-up">
+            <div class="bg-slate-900 p-6 text-white flex items-center gap-4">
+                <div class="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400">
+                    <i data-lucide="help-circle" class="w-6 h-6"></i>
                 </div>
-                <h1 class="text-2xl font-bold text-slate-900">Accesso Smart Working</h1>
-                <p class="text-slate-500 mt-2 text-sm">Inserisci le tue credenziali per gestire le prenotazioni.</p>
+                <div>
+                    <h3 id="modal-title" class="text-lg font-black tracking-tight">Titolo</h3>
+                </div>
             </div>
-            
-            <div id="login-error" class="hidden mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm border border-red-200"></div>
-
-            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-5">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Nome e Cognome</label>
-                    <input type="text" id="username" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="Es: Enea Giuseppe">
+            <div class="p-6">
+                <p id="modal-desc" class="text-slate-600 text-sm mb-8 font-medium">Descrizione</p>
+                <div class="flex gap-3 justify-end">
+                    <button onclick="closeModal()" class="px-5 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-900 rounded-xl transition-colors">Annulla</button>
+                    <button id="modal-confirm-btn" class="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all shadow-md shadow-indigo-200 active:scale-95">Conferma</button>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
-                    <input type="password" id="password" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="••••">
-                </div>
-                <button type="submit" id="login-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors flex justify-center items-center gap-2">
-                    <span>Accedi</span>
-                </button>
-            </form>
+            </div>
         </div>
     </div>
 
-    <!-- Schermata Principale Calendario -->
-    <div id="app-view" class="hidden">
-        <!-- Navbar -->
-        <nav class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-40">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between h-16 items-center">
-                    <div class="flex items-center gap-3">
-                        <i data-lucide="calendar-check" class="text-blue-600 h-6 w-6"></i>
-                        <span class="font-bold text-xl text-slate-900 hidden sm:block">SW Dashboard</span>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <div class="text-right">
-                            <div id="user-name-display" class="font-semibold text-sm text-slate-900">Nome</div>
-                            <div id="user-floor-display" class="text-xs text-slate-500">Piano</div>
+<script>
+    // ==========================================
+    // CONFIGURAZIONE E VARIABILI DI STATO
+    // ==========================================
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxxWGo33SrlOUEpWO20ru25X5QNLOE3pQKfoVZDDFeNF-cL1b1ro1TAAozzyMjUoF9h/exec';
+
+    const MAX_DAYS_PER_MONTH = 6;
+    const MAX_FRIDAYS_PER_MONTH = 2;
+
+    let state = {
+        currentUser: null,
+        appData: { bookings: [], floorStats: {} },
+        currentMonthDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+        isLoading: false,
+        isBoardView: false // Variabile per mostrare il calendario generale
+    };
+
+    // ==========================================
+    // INIZIALIZZAZIONE E LOGIN
+    // ==========================================
+    function init() {
+        const savedUser = localStorage.getItem('swUser');
+        if (savedUser) {
+            state.currentUser = JSON.parse(savedUser);
+            fetchData(); // Scarica i dati ed esegue il render()
+        } else {
+            render(); // Disegna il Login
+        }
+    }
+
+    async function handleLogin(e) {
+        e.preventDefault();
+        const btn = document.getElementById('login-btn');
+        const name = document.getElementById('username').value;
+        const pwd = document.getElementById('password').value;
+
+        btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> Accesso in corso...';
+        btn.disabled = true;
+
+        try {
+            const res = await callAPI({ action: 'login', name: name, password: pwd });
+            if (res.success) {
+                state.currentUser = res.data;
+                localStorage.setItem('swUser', JSON.stringify(state.currentUser));
+                state.isBoardView = false;
+                fetchData();
+            } else {
+                showNotification("Credenziali non valide. Riprova.", "error");
+                btn.innerHTML = 'Accedi alla Dashboard';
+                btn.disabled = false;
+                lucide.createIcons();
+            }
+        } catch (err) {
+            showNotification("Errore di connessione al server.", "error");
+            btn.innerHTML = 'Accedi alla Dashboard';
+            btn.disabled = false;
+            lucide.createIcons();
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem('swUser');
+        state.currentUser = null;
+        state.isBoardView = false;
+        render();
+    }
+
+    function toggleBoardView(forceStatus = null) {
+        if (forceStatus !== null) state.isBoardView = forceStatus;
+        else state.isBoardView = !state.isBoardView;
+        
+        if (state.isBoardView && state.appData.bookings.length === 0) {
+            fetchData(); // Se apro la board view e non ho dati, li scarico
+        } else {
+            render();
+        }
+    }
+
+    // ==========================================
+    // API E DATI (IL "CERVELLO" FUNZIONANTE)
+    // ==========================================
+    async function callAPI(payload) {
+        const response = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(payload)
+        });
+        return await response.json();
+    }
+
+    async function fetchData() {
+        state.isLoading = true;
+        render();
+        try {
+            const res = await callAPI({ action: 'getData' });
+            if (res.success) {
+                state.appData = res.data;
+                if(state.appData.bookings) {
+                    state.appData.bookings = state.appData.bookings.map(b => {
+                        let cleanDate = String(b.date);
+                        const originalBackendDate = cleanDate; // FONDAMENTALE PER LA CANCELLAZIONE
+                        
+                        if(cleanDate.includes('/')) {
+                            const parts = cleanDate.split('/');
+                            if(parts.length === 3 && parts[2].length === 4) {
+                                cleanDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                            }
+                        } else if(cleanDate.includes('T')) {
+                            const d = new Date(cleanDate);
+                            cleanDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                        }
+                        return { ...b, date: cleanDate, _exactBackendDate: originalBackendDate };
+                    });
+                } else {
+                    state.appData.bookings = [];
+                }
+            } else {
+                showNotification("Errore caricamento dati.", "error");
+            }
+        } catch (err) {
+            showNotification("Errore di rete.", "error");
+        } finally {
+            state.isLoading = false;
+            render();
+        }
+    }
+
+    // ==========================================
+    // MOTORE HTML E GRAFICA (LA "PELLE")
+    // ==========================================
+    function render() {
+        const app = document.getElementById('app');
+        
+        if (state.isLoading && state.appData.bookings.length === 0) {
+            app.innerHTML = `
+            <div class="flex-1 flex flex-col items-center justify-center p-4 bg-slate-900">
+                <i data-lucide="loader-2" class="w-16 h-16 text-indigo-500 animate-spin mb-6"></i>
+                <h1 class="text-white text-2xl font-black tracking-tight mb-2">Connessione al Server...</h1>
+                <p class="text-slate-400 font-medium">Sincronizzazione dati in corso</p>
+            </div>`;
+        } 
+        else if (state.isBoardView) {
+            app.innerHTML = renderBoardScreen();
+        }
+        else if (!state.currentUser) {
+            app.innerHTML = renderLoginScreen();
+        } 
+        else {
+            app.innerHTML = renderDashboardScreen();
+        }
+        lucide.createIcons();
+    }
+
+    function renderLoginScreen() {
+        return `
+            <div class="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 bg-slate-900">
+                <div class="max-w-md w-full bg-white rounded-[2rem] shadow-2xl overflow-hidden scale-up">
+                    <div class="p-8 sm:p-10">
+                        <div class="flex items-center gap-4 mb-10 pb-6 border-b border-slate-100 relative">
+                            <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                                <i data-lucide="building-2" class="w-6 h-6 text-indigo-600"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h1 class="text-xl font-black text-slate-900 leading-tight">Smart Booking</h1>
+                                <p class="text-sm text-slate-500 font-medium">Portale Operativo</p>
+                            </div>
                         </div>
-                        <button onclick="logout()" class="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors" title="Esci">
+                        
+                        <form id="login-form" onsubmit="handleLogin(event)" class="space-y-6 mb-8">
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 mb-2">Nome e Cognome</label>
+                                <input type="text" id="username" required class="w-full px-5 py-4 rounded-2xl bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 focus:bg-white focus:outline-none transition-all text-slate-800 font-medium" placeholder="Es: Enea Giuseppe">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 mb-2">Password</label>
+                                <input type="password" id="password" required class="w-full px-5 py-4 rounded-2xl bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 focus:bg-white focus:outline-none transition-all tracking-widest font-medium" placeholder="••••••••">
+                            </div>
+                            <button type="submit" id="login-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-200 transition-all active:scale-[0.98] flex justify-center items-center gap-2">
+                                Accedi alla Dashboard
+                            </button>
+                        </form>
+
+                        <div class="relative">
+                            <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div>
+                            <div class="relative flex justify-center text-sm"><span class="px-2 bg-white text-slate-400 font-bold">OPPURE</span></div>
+                        </div>
+
+                        <button onclick="toggleBoardView(true)" class="mt-8 w-full bg-white border-2 border-slate-200 hover:border-slate-800 hover:bg-slate-800 hover:text-white text-slate-700 font-bold py-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98]">
+                            <i data-lucide="calendar-days" class="w-5 h-5"></i> Vedi Calendario Generale
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    function renderDashboardScreen() {
+        const year = state.currentMonthDate.getFullYear();
+        const month = state.currentMonthDate.getMonth();
+        const monthStr = `${year}-${String(month+1).padStart(2,'0')}`;
+        
+        // Calcolo Statistiche Mensili per la colonna sinistra
+        const userMonthBookings = state.appData.bookings.filter(b => String(b.userId) === String(state.currentUser.id) && b.date.startsWith(monthStr));
+        const fridayBookingsCount = userMonthBookings.filter(b => new Date(b.date).getDay() === 5).length;
+        
+        const limit = state.appData.floorStats[state.currentUser.floor]?.limit || 1;
+        const totalPeople = state.appData.floorStats[state.currentUser.floor]?.total || 1;
+
+        return `
+            <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-40">
+                <div class="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-md">
+                            <i data-lucide="building-2" class="w-5 h-5 text-white"></i>
+                        </div>
+                        <h1 class="font-black text-xl tracking-tight text-slate-800 hidden sm:block">Smart Booking</h1>
+                    </div>
+                    <div class="flex items-center gap-3 sm:gap-5">
+                        <button onclick="toggleBoardView(true)" class="hidden md:flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors">
+                            <i data-lucide="calendar" class="w-4 h-4"></i> Calendario Generale
+                        </button>
+                        <div class="h-8 w-px bg-slate-200 hidden md:block"></div>
+                        <div class="flex items-center gap-3">
+                            <div class="text-right hidden sm:block">
+                                <p class="text-sm font-black text-slate-800 leading-tight">${state.currentUser.name}</p>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${state.currentUser.floor}</p>
+                            </div>
+                            <div class="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center font-black text-indigo-700">
+                                ${state.currentUser.name.charAt(0)}
+                            </div>
+                        </div>
+                        <button onclick="logout()" class="p-2 hover:bg-red-50 hover:text-red-600 rounded-xl transition-colors text-slate-400">
                             <i data-lucide="log-out" class="w-5 h-5"></i>
                         </button>
                     </div>
                 </div>
-            </div>
-        </nav>
-
-        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            </header>
             
-            <!-- Alert per messaggi -->
-            <div id="alert-box" class="hidden mb-6 p-4 rounded-xl border text-sm flex items-start justify-between gap-4 transition-all">
-                <div id="alert-message" class="flex-1">Messaggio</div>
-                <button onclick="closeAlert()" class="opacity-50 hover:opacity-100"><i data-lucide="x" class="w-4 h-4"></i></button>
-            </div>
-
-            <!-- Controlli Mese -->
-            <div class="bg-white rounded-t-2xl shadow-sm border border-slate-200 p-4 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div class="flex items-center gap-3">
-                    <h2 class="text-2xl font-bold text-slate-800 capitalize" id="month-year-display">Mese Anno</h2>
-                    <div id="loading-indicator" class="hidden loader"></div>
+            <main class="flex-1 max-w-7xl mx-auto px-4 py-8 w-full grid grid-cols-1 xl:grid-cols-12 gap-8 scale-up">
+                
+                <!-- COLONNA SINISTRA: Statistiche -->
+                <div class="xl:col-span-4 space-y-6">
+                    <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <i data-lucide="pie-chart" class="w-4 h-4 text-indigo-500"></i> Limiti Mese Corrente
+                            </h2>
+                            ${state.isLoading ? '<i data-lucide="loader-2" class="w-4 h-4 text-indigo-500 animate-spin"></i>' : ''}
+                        </div>
+                        <div class="space-y-6">
+                            <div>
+                                <div class="flex justify-between items-end mb-2">
+                                    <span class="text-sm font-bold text-slate-600">Giorni totali in SW</span>
+                                    <span class="text-sm font-black text-slate-800">${userMonthBookings.length} <span class="text-slate-400">/ ${MAX_DAYS_PER_MONTH}</span></span>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-2.5">
+                                    <div class="bg-indigo-600 h-2.5 rounded-full transition-all duration-700" style="width: ${(userMonthBookings.length / MAX_DAYS_PER_MONTH) * 100}%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between items-end mb-2">
+                                    <span class="text-sm font-bold text-slate-600">Venerdì in SW</span>
+                                    <span class="text-sm font-black text-slate-800">${fridayBookingsCount} <span class="text-slate-400">/ ${MAX_FRIDAYS_PER_MONTH}</span></span>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-2.5">
+                                    <div class="bg-indigo-400 h-2.5 rounded-full transition-all duration-700" style="width: ${(fridayBookingsCount / MAX_FRIDAYS_PER_MONTH) * 100}%"></div>
+                                </div>
+                            </div>
+                            <div class="pt-4 border-t border-slate-100">
+                                <div class="text-sm text-slate-500 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                    Il tuo piano <b>${state.currentUser.floor}</b> permette un massimo di <b class="text-indigo-600">${limit} persone</b> in SW al giorno (30% su ${totalPeople}).
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
-                    <button onclick="changeMonth(-1)" class="p-2 hover:bg-white rounded-lg transition-colors focus:outline-none text-slate-600 shadow-sm">
-                        <i data-lucide="chevron-left" class="w-5 h-5"></i>
-                    </button>
-                    <button onclick="resetToToday()" class="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white rounded-lg transition-colors shadow-sm">
-                        Oggi
-                    </button>
-                    <button onclick="changeMonth(1)" class="p-2 hover:bg-white rounded-lg transition-colors focus:outline-none text-slate-600 shadow-sm">
-                        <i data-lucide="chevron-right" class="w-5 h-5"></i>
-                    </button>
-                </div>
-            </div>
 
-            <!-- Info Piano Corrente -->
-            <div class="bg-slate-50 border-x border-b border-slate-200 p-3 text-sm text-slate-600 flex justify-between items-center">
-                <span>Capienza massima <b id="floor-name-info"></b>: <b id="floor-limit-info" class="text-blue-600"></b> posti/giorno (30%)</span>
-                <button onclick="fetchData()" class="flex items-center gap-1 text-blue-600 hover:text-blue-800" title="Aggiorna dati">
-                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                <!-- COLONNA DESTRA: Calendario -->
+                <div class="xl:col-span-8 bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col overflow-hidden relative">
+                    ${state.isLoading ? '<div class="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center"><i data-lucide="loader-2" class="w-10 h-10 text-indigo-600 animate-spin"></i></div>' : ''}
+                    
+                    <div class="p-6 sm:p-8 border-b flex items-center justify-between bg-white">
+                        <h2 class="text-2xl font-black capitalize text-slate-800 tracking-tight">
+                            ${state.currentMonthDate.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}
+                        </h2>
+                        <div class="flex gap-2">
+                            <button onclick="changeMonth(-1)" class="p-2 sm:p-3 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 hover:text-indigo-600 transition-all active:scale-90">
+                                <i data-lucide="chevron-left" class="w-5 h-5"></i>
+                            </button>
+                            <button onclick="resetToToday()" class="px-4 py-2 text-sm font-black text-slate-600 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 hover:text-indigo-600 transition-all active:scale-90 hidden sm:block">
+                                Oggi
+                            </button>
+                            <button onclick="changeMonth(1)" class="p-2 sm:p-3 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 hover:text-indigo-600 transition-all active:scale-90">
+                                <i data-lucide="chevron-right" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6 sm:p-8 flex-1">
+                        <div class="grid grid-cols-7 gap-2 sm:gap-4 mb-4 text-center font-black text-slate-400 text-[10px] sm:text-xs uppercase tracking-widest">
+                            ${['Lun','Mar','Mer','Gio','Ven','Sab','Dom'].map(d=>`<div>${d}</div>`).join('')}
+                        </div>
+                        <div class="grid grid-cols-7 gap-2 sm:gap-4">
+                            ${generateCalendarCellsHTML()}
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Tasto Mobile per Calendario Generale -->
+            <div class="md:hidden fixed bottom-0 left-0 w-full p-4 bg-white border-t border-slate-200 z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+                <button onclick="toggleBoardView(true)" class="w-full bg-slate-800 text-white font-bold py-4 rounded-xl flex justify-center items-center gap-2 shadow-xl shadow-slate-300">
+                    <i data-lucide="calendar" class="w-5 h-5"></i> Calendario Generale Studio
                 </button>
             </div>
+            <div class="h-20 md:hidden"></div>
+        `;
+    }
 
-            <!-- Griglia Calendario -->
-            <div class="bg-white shadow-sm border-x border-b border-slate-200 rounded-b-2xl overflow-hidden">
-                <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
-                    <div class="py-3 text-center text-xs font-semibold text-slate-500 uppercase">Lun</div>
-                    <div class="py-3 text-center text-xs font-semibold text-slate-500 uppercase">Mar</div>
-                    <div class="py-3 text-center text-xs font-semibold text-slate-500 uppercase">Mer</div>
-                    <div class="py-3 text-center text-xs font-semibold text-slate-500 uppercase">Gio</div>
-                    <div class="py-3 text-center text-xs font-semibold text-slate-500 uppercase">Ven</div>
-                    <div class="py-3 text-center text-xs font-semibold text-red-400 uppercase">Sab</div>
-                    <div class="py-3 text-center text-xs font-semibold text-red-400 uppercase">Dom</div>
-                </div>
-                <div id="calendar-grid" class="grid grid-cols-7 auto-rows-[140px] sm:auto-rows-[160px] bg-slate-200 gap-px">
-                    <!-- Generato da JS -->
-                </div>
-            </div>
-        </main>
-    </div>
-
-    <!-- Modal Conferma Prenotazione/Cancellazione -->
-    <div id="action-modal" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-            <h3 id="modal-title" class="text-lg font-bold text-slate-900 mb-2">Titolo</h3>
-            <p id="modal-desc" class="text-slate-500 text-sm mb-6">Descrizione</p>
-            <div class="flex gap-3 justify-end">
-                <button onclick="closeModal()" class="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">Annulla</button>
-                <button id="modal-confirm-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">Conferma</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        lucide.createIcons();
-
-        // ---------------------------------------------------------
-        // L'URL DELLA TUA APP SCRIPT È STATO INSERITO QUI:
-        // ---------------------------------------------------------
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxxWGo33SrlOUEpWO20ru25X5QNLOE3pQKfoVZDDFeNF-cL1b1ro1TAAozzyMjUoF9h/exec';
-
-        let currentUser = null;
-        let currentDate = new Date();
-        let appData = { bookings: [], floorStats: {} };
-        let isLoading = false;
-
-        // Inizializzazione
-        function init() {
-            const savedUser = localStorage.getItem('swUser');
-            if (savedUser) {
-                currentUser = JSON.parse(savedUser);
-                showApp();
-                fetchData();
-            }
-        }
-
-        // --- SISTEMA DI LOGIN ---
-        async function handleLogin(e) {
-            e.preventDefault();
-            const btn = document.getElementById('login-btn');
-            const errorDiv = document.getElementById('login-error');
-            const name = document.getElementById('username').value;
-            const pwd = document.getElementById('password').value;
-
-            btn.innerHTML = '<div class="loader border-white border-top-transparent"></div> Accesso...';
-            btn.disabled = true;
-            errorDiv.classList.add('hidden');
-
-            try {
-                const res = await callAPI({ action: 'login', name: name, password: pwd });
-                if (res.success) {
-                    currentUser = res.data;
-                    localStorage.setItem('swUser', JSON.stringify(currentUser));
-                    showApp();
-                    fetchData();
-                } else {
-                    throw new Error(res.error);
-                }
-            } catch (err) {
-                errorDiv.textContent = err.message || "Errore di connessione.";
-                errorDiv.classList.remove('hidden');
-            } finally {
-                btn.innerHTML = '<span>Accedi</span>';
-                btn.disabled = false;
-            }
-        }
-
-        function logout() {
-            localStorage.removeItem('swUser');
-            currentUser = null;
-            document.getElementById('app-view').classList.add('hidden');
-            document.getElementById('login-view').classList.replace('hidden', 'flex');
-            document.getElementById('login-form').reset();
-        }
-
-        function showApp() {
-            document.getElementById('login-view').classList.replace('flex', 'hidden');
-            document.getElementById('app-view').classList.remove('hidden');
-            document.getElementById('user-name-display').textContent = currentUser.name;
-            document.getElementById('user-floor-display').textContent = currentUser.floor;
-            document.getElementById('floor-name-info').textContent = currentUser.floor;
-        }
-
-        // --- GESTIONE DATI E API ---
-        async function callAPI(payload) {
-            const response = await fetch(SCRIPT_URL, {
-                method: 'POST',
-                // text/plain aggira i blocchi CORS di default dei browser verso le webapp Google
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify(payload)
-            });
-            return await response.json();
-        }
-
-        async function fetchData() {
-            setLoading(true);
-            try {
-                const res = await callAPI({ action: 'getData' });
-                if (res.success) {
-                    appData = res.data;
-                    
-                    // Assicuriamoci che i dati esistano prima di elaborarli
-                    if(appData.bookings) {
-                        appData.bookings = appData.bookings.map(b => {
-                            let cleanDate = String(b.date);
-                            
-                            // IL SEGRETO ANTIPROIETTILE: Salviamo la data ESATTA così come ce la manda il server
-                            const originalBackendDate = cleanDate; 
-                            
-                            // TRADUTTORE DATE: Adatta la data solo per farla vedere graficamente nel calendario
-                            if(cleanDate.includes('/')) {
-                                const parts = cleanDate.split('/');
-                                if(parts.length === 3 && parts[2].length === 4) {
-                                    cleanDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-                                }
-                            } else if(cleanDate.includes('T')) {
-                                const d = new Date(cleanDate);
-                                cleanDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                            }
-                            
-                            // Aggiungiamo _exactBackendDate alla memoria della prenotazione
-                            return { ...b, date: cleanDate, _exactBackendDate: originalBackendDate };
-                        });
-                    } else {
-                        appData.bookings = [];
-                    }
-                    
-                    document.getElementById('floor-limit-info').textContent = appData.floorStats[currentUser.floor]?.limit || 0;
-                    renderCalendar();
-                } else {
-                    showAlert("Errore caricamento: " + res.error, "error");
-                }
-            } catch (err) {
-                showAlert("Errore di rete durante l'aggiornamento.", "error");
-            } finally {
-                setLoading(false);
-            }
-        }
-
-        // --- AZIONI PRENOTAZIONE ---
-        function promptBooking(dateStr) {
-            const formattedDate = dateStr.split('-').reverse().join('/');
-            
-            document.getElementById('modal-title').textContent = "Prenota Smart Working";
-            document.getElementById('modal-desc').innerHTML = `Vuoi confermare la prenotazione per il giorno <b>${formattedDate}</b>?`;
-            
-            const btn = document.getElementById('modal-confirm-btn');
-            btn.className = "px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors";
-            btn.textContent = "Conferma Prenotazione";
-            
-            btn.onclick = function() { executeBooking(dateStr); };
-            
-            document.getElementById('action-modal').classList.replace('hidden', 'flex');
-        }
-
-        function promptCancel(dateStr) {
-            const formattedDate = dateStr.split('-').reverse().join('/');
-            
-            document.getElementById('modal-title').textContent = "Cancella Prenotazione";
-            document.getElementById('modal-desc').innerHTML = `Vuoi cancellare la tua prenotazione del <b>${formattedDate}</b>?`;
-            
-            const btn = document.getElementById('modal-confirm-btn');
-            btn.className = "px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors";
-            btn.textContent = "Cancella";
-            
-            // TROVA LA PRENOTAZIONE ESATTA: peschiamo la data magica salvata prima
-            const myBooking = appData.bookings.find(b => String(b.userId) === String(currentUser.id) && b.date === dateStr);
-            const targetBackendDate = myBooking ? myBooking._exactBackendDate : dateStr;
-            
-            // Rimandiamo al server la sua stessa medicina
-            btn.onclick = function() { executeCancel(targetBackendDate); };
-            
-            document.getElementById('action-modal').classList.replace('hidden', 'flex');
-        }
-
-        function closeModal() {
-            document.getElementById('action-modal').classList.replace('flex', 'hidden');
-        }
-
-        async function executeBooking(dateToProcess) {
-            closeModal();
-            setLoading(true);
-            try {
-                const res = await callAPI({ action: 'book', userId: currentUser.id, date: dateToProcess });
-                if (res.success) {
-                    showAlert("Prenotazione confermata con successo!", "success");
-                    await fetchData(); // Ricarica i dati per aggiornare i conteggi
-                } else {
-                    showAlert(res.error, "error"); // Mostra ad es. "Hai già 2 venerdì"
-                }
-            } catch (err) {
-                showAlert(err.message || "Errore di connessione.", "error");
-            } finally {
-                setLoading(false);
-            }
-        }
-
-        async function executeCancel(dateToProcess) {
-            closeModal();
-            setLoading(true);
-            try {
-                const res = await callAPI({ action: 'delete', userId: currentUser.id, date: dateToProcess });
-                if (res.success) {
-                    showAlert("Prenotazione cancellata.", "success");
-                    await fetchData();
-                } else {
-                    showAlert(res.error, "error");
-                }
-            } catch (err) {
-                showAlert("Errore di connessione.", "error");
-            } finally {
-                setLoading(false);
-            }
-        }
-
-        // --- CALCOLO FESTIVITA' E WEEKEND ---
-        function getPasquetta(year) {
-            const f = Math.floor, G = year % 19, C = f(year / 100);
-            const H = (C - f(C / 4) - f((8 * C + 13) / 25) + 19 * G + 15) % 30;
-            const I = H - f(H / 28) * (1 - f(29 / (H + 1)) * f((21 - G) / 11));
-            const J = (year + f(year / 4) + I + 2 - C + f(C / 4)) % 7;
-            const L = I - J, month = 3 + f((L + 40) / 44), day = L + 28 - 31 * f(month / 4);
-            const easter = new Date(year, month - 1, day);
-            easter.setDate(easter.getDate() + 1); // Aggiunge 1 giorno per Pasquetta
-            return `${year}-${String(easter.getMonth() + 1).padStart(2, '0')}-${String(easter.getDate()).padStart(2, '0')}`;
-        }
-
-        function isHolidayOrWeekend(dateStr) {
-            const date = new Date(dateStr);
-            const day = date.getDay();
-            if (day === 0 || day === 6) return { is: true, type: 'weekend' }; // 0 = Domenica, 6 = Sabato
-
-            const mmdd = dateStr.substring(5);
-            // Principali festività italiane
-            const festeFisse = ['01-01', '01-06', '04-25', '05-01', '06-02', '08-15', '11-01', '12-08', '12-25', '12-26'];
-            if (festeFisse.includes(mmdd)) return { is: true, type: 'festivita' };
-            if (dateStr === getPasquetta(date.getFullYear())) return { is: true, type: 'festivita' };
-
-            return { is: false, type: '' };
-        }
-
-        // --- RENDERIZZAZIONE CALENDARIO ---
-        function changeMonth(delta) {
-            currentDate.setMonth(currentDate.getMonth() + delta);
-            renderCalendar();
-        }
-
-        function resetToToday() {
-            currentDate = new Date();
-            renderCalendar();
-        }
-
-        function renderCalendar() {
-            const year = currentDate.getFullYear();
-            const month = currentDate.getMonth();
-
-            const monthNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
-            document.getElementById('month-year-display').textContent = `${monthNames[month]} ${year}`;
-
-            const grid = document.getElementById('calendar-grid');
-            grid.innerHTML = '';
-
-            const firstDayOfMonth = new Date(year, month, 1);
-            const lastDayOfMonth = new Date(year, month + 1, 0);
-            
-            let startDayOfWeek = firstDayOfMonth.getDay();
-            startDayOfWeek = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1; // Lunedì come giorno 0
-
-            const totalDays = lastDayOfMonth.getDate();
-            const todayStr = new Date().toISOString().substring(0,10);
-            const limit = appData.floorStats[currentUser.floor]?.limit || 999;
-
-            // Spazi vuoti prima del primo giorno del mese
-            for (let i = 0; i < startDayOfWeek; i++) {
-                grid.innerHTML += `<div class="bg-white/40 p-2 pointer-events-none"></div>`;
-            }
-
-            // Generazione dei giorni
-            for (let day = 1; day <= totalDays; day++) {
-                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const isPast = dateStr < todayStr;
-                const isToday = dateStr === todayStr;
-                const holidayCheck = isHolidayOrWeekend(dateStr);
-                
-                const dayBookings = appData.bookings.filter(b => b.date === dateStr);
-                const myBooking = dayBookings.find(b => String(b.userId) === String(currentUser.id));
-                const floorBookings = dayBookings.filter(b => b.floor === currentUser.floor).length;
-                
-                const isFloorFull = floorBookings >= limit;
-
-                // Colori delle celle
-                let cellClass = "bg-white p-2 flex flex-col relative transition-colors group ";
-                if (holidayCheck.is) cellClass += "bg-red-50/50 ";
-                else if (isPast && !myBooking) cellClass += "bg-slate-50 opacity-60 ";
-                else cellClass += "hover:bg-blue-50/30 ";
-
-                const dayNumClass = isToday 
-                    ? "w-7 h-7 flex items-center justify-center bg-blue-600 text-white font-bold rounded-full text-sm shrink-0" 
-                    : `text-sm font-medium ${holidayCheck.is ? 'text-red-400' : 'text-slate-700'} shrink-0 pl-1`;
-
-                const cell = document.createElement('div');
-                cell.className = cellClass;
-                
-                // Intestazione cella (Numero giorno + contatore posti)
-                let html = `
-                    <div class="flex justify-between items-start mb-1">
-                        <div class="${dayNumClass}">${day}</div>
-                        ${!holidayCheck.is && floorBookings > 0 ? `<div class="text-[10px] px-1.5 py-0.5 rounded-full ${isFloorFull ? 'bg-orange-100 text-orange-700 font-bold' : 'bg-slate-100 text-slate-500'}">${floorBookings}/${limit} ${currentUser.floor}</div>` : ''}
-                    </div>
-                    <div class="flex-1 overflow-y-auto scrollbar-hide space-y-1">
-                `;
-
-                // Badge persone prenotate
-                dayBookings.forEach(b => {
-                    const isMe = String(b.userId) === String(currentUser.id);
-                    let badgeClass = "bg-slate-100 text-slate-700 border-slate-200";
-                    if(b.floor === "Architettura") badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
-                    if(b.floor === "Interior Design") badgeClass = "bg-purple-50 text-purple-700 border-purple-200";
-                    if(b.floor === "New Space") badgeClass = "bg-amber-50 text-amber-700 border-amber-200";
-                    if(isMe) badgeClass = "bg-blue-600 text-white border-blue-700 font-bold shadow-sm"; 
-
-                    html += `
-                        <div class="text-[11px] px-1.5 py-1 rounded border ${badgeClass} truncate flex items-center gap-1 leading-none" title="${b.name} (${b.floor})">
-                            <i data-lucide="${isMe ? 'user-check' : 'user'}" class="w-3 h-3 shrink-0"></i>
-                            <span class="truncate">${b.name.split(' ')[0]} ${b.name.split(' ').length > 1 ? b.name.split(' ')[1][0]+'.' : ''}</span>
+    function renderBoardScreen() {
+        return `
+            <header class="bg-slate-900 text-white shadow-md sticky top-0 z-40">
+                <div class="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center border border-slate-700">
+                            <i data-lucide="calendar-days" class="w-5 h-5 text-indigo-400"></i>
                         </div>
-                    `;
-                });
+                        <h1 class="font-black text-lg sm:text-xl tracking-tight">Calendario Studio</h1>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="toggleBoardView(false)" class="bg-slate-800 hover:bg-slate-700 text-sm font-bold py-2.5 px-3 sm:px-5 rounded-xl border border-slate-700 transition-all flex items-center gap-2">
+                            ${state.currentUser ? '<i data-lucide="arrow-left" class="w-4 h-4"></i> <span class="hidden sm:inline">Torna Indietro</span>' : '<i data-lucide="log-in" class="w-4 h-4"></i> <span class="hidden sm:inline">Accedi</span>'}
+                        </button>
+                    </div>
+                </div>
+            </header>
+            
+            <main class="flex-1 max-w-7xl mx-auto px-4 py-8 w-full scale-up">
+                <div class="bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col overflow-hidden relative">
+                    ${state.isLoading ? '<div class="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center"><i data-lucide="loader-2" class="w-10 h-10 text-indigo-600 animate-spin"></i></div>' : ''}
+                    
+                    <div class="p-6 sm:p-8 border-b flex items-center justify-between bg-slate-50">
+                        <h2 class="text-2xl sm:text-3xl font-black text-slate-800 uppercase tracking-tight">
+                            ${state.currentMonthDate.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}
+                        </h2>
+                        <div class="flex gap-2">
+                            <button onclick="changeMonth(-1)" class="p-3 bg-white border border-slate-200 rounded-xl hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all active:scale-90">
+                                <i data-lucide="chevron-left" class="w-5 h-5"></i>
+                            </button>
+                            <button onclick="changeMonth(1)" class="p-3 bg-white border border-slate-200 rounded-xl hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all active:scale-90">
+                                <i data-lucide="chevron-right" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-6 sm:p-8 overflow-x-auto">
+                        <div class="min-w-[800px]">
+                            <div class="grid grid-cols-7 gap-4 mb-6 text-center font-black text-slate-400 text-xs uppercase tracking-widest">
+                                ${['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'].map(d=>`<div>${d}</div>`).join('')}
+                            </div>
+                            <div class="grid grid-cols-7 gap-4">
+                                ${generateBoardCalendarCellsHTML()}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        `;
+    }
 
-                html += `</div>`;
+    // ==========================================
+    // LOGICA DI GENERAZIONE CELLE CALENDARIO
+    // ==========================================
+    function getCapacityColorLevels(percentage) {
+        if (percentage >= 100) return { bar: 'bg-red-500', badgeBg: 'bg-red-50', badgeText: 'text-red-700', border: 'border-red-500' };
+        if (percentage >= 75) return { bar: 'bg-orange-500', badgeBg: 'bg-orange-50', badgeText: 'text-orange-700', border: 'border-orange-400' };
+        if (percentage >= 40) return { bar: 'bg-amber-400', badgeBg: 'bg-amber-50', badgeText: 'text-amber-700', border: 'border-amber-300' };
+        if (percentage > 0) return { bar: 'bg-emerald-500', badgeBg: 'bg-emerald-50', badgeText: 'text-emerald-700', border: 'border-emerald-300' };
+        return { bar: 'bg-slate-200', badgeBg: 'bg-slate-100', badgeText: 'text-slate-500', border: 'border-slate-100' };
+    }
 
-                // Bottoni interattivi (mostrati all'hover del mouse)
-                if (!isPast && !holidayCheck.is) {
-                    if (myBooking) {
-                        html += `
-                            <div class="absolute inset-0 bg-white/80 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onclick="promptCancel('${dateStr}')">
-                                <button class="bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-red-200 shadow-sm flex items-center gap-1">
-                                    <i data-lucide="x-circle" class="w-3 h-3"></i> Rimuovi
-                                </button>
-                            </div>`;
-                    } else if (!isFloorFull) {
-                        html += `
-                            <div class="absolute inset-0 bg-white/80 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onclick="promptBooking('${dateStr}')">
-                                <button class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-blue-200 shadow-sm flex items-center gap-1">
-                                    <i data-lucide="plus-circle" class="w-3 h-3"></i> Prenota
-                                </button>
-                            </div>`;
-                    } else {
-                        html += `
-                            <div class="absolute inset-0 bg-white/80 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <span class="bg-orange-100 text-orange-700 text-[10px] font-bold px-2 py-1 rounded border border-orange-200 text-center">
-                                    Piano Saturo
-                                </span>
-                            </div>`;
-                    }
-                }
+    function generateCalendarCellsHTML() {
+        const year = state.currentMonthDate.getFullYear();
+        const month = state.currentMonthDate.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        let firstDay = new Date(year, month, 1).getDay(); 
+        firstDay = firstDay === 0 ? 6 : firstDay - 1;
+        
+        let html = ''; 
+        const todayStr = new Date().toISOString().substring(0,10);
+        
+        for (let i = 0; i < firstDay; i++) {
+            html += `<div class="aspect-square rounded-2xl bg-slate-50/50 border border-dashed border-slate-200"></div>`;
+        }
 
-                cell.innerHTML = html;
-                grid.appendChild(cell);
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const dObj = new Date(year, month, day);
+            const isPast = dateStr < todayStr;
+            const isToday = dateStr === todayStr;
+            const holidayCheck = isHolidayOrWeekend(dateStr);
+            
+            const floorBookings = state.appData.bookings.filter(b => b.date === dateStr && b.floor === state.currentUser.floor);
+            const myBooking = floorBookings.find(b => String(b.userId) === String(state.currentUser.id));
+            const limit = state.appData.floorStats[state.currentUser.floor]?.limit || 1;
+            
+            let relPerc = Math.round((floorBookings.length / limit) * 100); 
+            if (relPerc > 100) relPerc = 100;
+            const colors = getCapacityColorLevels(relPerc);
+            
+            let cCl = `day-cell aspect-square p-2 sm:p-3 rounded-2xl border-2 flex flex-col relative transition-all group `;
+            let innerHtml = "";
+            let numColor = "text-slate-700";
+            
+            if (holidayCheck.is) {
+                cCl += " bg-red-50 border-red-100 opacity-80 pointer-events-none";
+                numColor = "text-red-500";
+                innerHtml = `<div class="mt-auto text-[8px] sm:text-[9px] font-black text-red-400 text-center uppercase mb-1 hidden sm:block">${holidayCheck.type === 'weekend' ? 'Weekend' : 'Festivo'}</div>
+                             <div class="sm:hidden mt-auto mx-auto w-2 h-2 rounded-full bg-red-400"></div>`;
+            } 
+            else if (isPast && !myBooking) {
+                cCl += " bg-slate-50 border-slate-100 opacity-60 pointer-events-none";
+                numColor = "text-slate-400";
             }
-            lucide.createIcons();
-        }
+            else {
+                cCl += " bg-white hover:shadow-xl hover:-translate-y-1 cursor-pointer overflow-hidden";
+                if (isToday) cCl += " ring-4 ring-indigo-100 border-indigo-500";
+                else cCl += " border-slate-100 hover:border-indigo-300";
 
-        // --- UTILS PER NOTIFICHE ---
-        function setLoading(state) {
-            isLoading = state;
-            document.getElementById('loading-indicator').style.display = state ? 'block' : 'none';
-        }
+                // Barra di stato inferiore
+                if (myBooking) {
+                    cCl = cCl.replace('bg-white', 'bg-indigo-600 border-indigo-700 hover:border-indigo-800');
+                    numColor = "text-white";
+                    innerHtml = `
+                        <div class="hidden sm:block text-[9px] font-black bg-white/20 text-white rounded-md py-1 px-1 text-center uppercase mt-auto">IL TUO SW</div>
+                        <div class="sm:hidden mt-auto mx-auto w-2 h-2 rounded-full bg-white"></div>
+                        <div class="absolute inset-0 bg-red-600/90 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" onclick="promptCancel('${dateStr}')">
+                            <i data-lucide="x-circle" class="w-6 h-6 text-white mb-1"></i>
+                            <span class="text-white text-[10px] font-black uppercase">Rimuovi</span>
+                        </div>`;
+                } else if (floorBookings.length >= limit) {
+                    cCl = cCl.replace('hover:border-indigo-300', 'hover:border-red-300').replace('hover:-translate-y-1', '');
+                    innerHtml = `
+                        <div class="hidden sm:flex text-[9px] font-black bg-red-500 text-white rounded-md py-1 px-1 justify-center items-center gap-1 uppercase mt-auto"><i data-lucide="lock" class="w-3 h-3"></i> PIENO</div>
+                        <div class="sm:hidden mt-auto mx-auto w-2 h-2 rounded-full bg-red-500"></div>`;
+                } else {
+                    innerHtml = `
+                        <div class="hidden sm:block text-[9px] font-bold text-center ${colors.badgeText} ${colors.badgeBg} rounded-md py-1 mt-auto truncate">${relPerc}% OCCUPATO</div>
+                        <div class="sm:hidden mt-auto mx-auto w-2 h-2 rounded-full ${colors.bar}"></div>
+                        <div class="absolute inset-0 bg-indigo-600/90 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" onclick="promptBooking('${dateStr}')">
+                            <i data-lucide="plus-circle" class="w-6 h-6 text-white mb-1"></i>
+                            <span class="text-white text-[10px] font-black uppercase">Prenota</span>
+                        </div>`;
+                }
+            }
 
-        function showAlert(message, type) {
-            const box = document.getElementById('alert-box');
-            const msg = document.getElementById('alert-message');
+            html += `
+                <div class="${cCl}">
+                    <span class="font-black text-sm sm:text-base ${numColor}">${day}</span>
+                    ${innerHtml}
+                </div>`;
+        }
+        return html;
+    }
+
+    function generateBoardCalendarCellsHTML() {
+        const year = state.currentMonthDate.getFullYear();
+        const month = state.currentMonthDate.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        let firstDay = new Date(year, month, 1).getDay(); 
+        firstDay = firstDay === 0 ? 6 : firstDay - 1;
+        
+        let html = '';
+        
+        for (let i = 0; i < firstDay; i++) {
+            html += `<div class="h-32 rounded-2xl bg-slate-50/50 border border-dashed border-slate-200"></div>`;
+        }
+        
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const holidayCheck = isHolidayOrWeekend(dateStr);
+            const dayB = state.appData.bookings.filter(b => b.date === dateStr);
             
-            box.className = `mb-6 p-4 rounded-xl border text-sm flex items-start justify-between gap-4 transition-all ${
-                type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
-            }`;
-            msg.innerHTML = `<strong>${type === 'success' ? 'Operazione riuscita!' : 'Attenzione!'}</strong><br>${message}`;
-            box.classList.remove('hidden');
+            let cellCl = `h-32 p-3 rounded-2xl border-2 flex flex-col relative bg-white border-slate-100 `;
+            let inner = '';
             
-            setTimeout(() => { closeAlert(); }, 5000); // Scompare da solo dopo 5 secondi
+            if (holidayCheck.is) { 
+                cellCl = "h-32 p-3 rounded-2xl border-2 flex flex-col bg-red-50 border-red-100 opacity-70"; 
+                inner = `<div class="mt-auto text-[10px] font-black text-red-400 text-center uppercase mb-2">${holidayCheck.type === 'weekend' ? 'Weekend' : 'Festivo'}</div>`; 
+            }
+            else { 
+                inner = `
+                    <div class="mt-2 space-y-1 overflow-hidden flex-1">
+                        ${dayB.slice(0, 3).map(b => `<div class="text-[10px] font-bold bg-slate-50 text-slate-700 px-2 py-1 rounded-md truncate border border-slate-100 shadow-sm">${b.name}</div>`).join('')}
+                        ${dayB.length > 3 ? `<div class="text-[10px] font-bold text-slate-400 px-2">+ altri ${dayB.length - 3}</div>` : ''}
+                    </div>
+                    <div class="mt-2 pt-2 border-t border-slate-100 text-[10px] font-black text-indigo-500 uppercase tracking-tight text-right">
+                        ${dayB.length} PRENOTATI
+                    </div>`;
+            }
+            
+            html += `
+                <div class="${cellCl}">
+                    <span class="font-black text-sm ${holidayCheck.is ? 'text-red-500' : 'text-slate-500'}">${day}</span>
+                    ${inner}
+                </div>`;
         }
+        return html;
+    }
 
-        function closeAlert() {
-            document.getElementById('alert-box').classList.add('hidden');
-        }
+    // ==========================================
+    // AZIONI, NOTIFICHE E MODALS
+    // ==========================================
+    function changeMonth(delta) {
+        state.currentMonthDate.setMonth(state.currentMonthDate.getMonth() + delta);
+        render();
+    }
 
-        // Fai partire l'app!
-        init();
-    </script>
+    function resetToToday() {
+        state.currentMonthDate = new Date();
+        render();
+    }
+
+    function showNotification(message, type = 'error') {
+        const container = document.getElementById('notification-container');
+        const bgColor = type === 'error' ? 'bg-red-600' : 'bg-emerald-600';
+        const icon = type === 'error' ? 'alert-circle' : 'check-circle-2';
+        
+        const toast = document.createElement('div');
+        toast.className = `toast-enter ${bgColor} text-white px-5 py-4 rounded-2xl shadow-xl flex items-center gap-4 w-full border border-white/20`;
+        toast.innerHTML = `<i data-lucide="${icon}" class="w-6 h-6 flex-shrink-0"></i><p class="font-bold text-sm tracking-wide">${message}</p>`;
+        
+        container.appendChild(toast);
+        lucide.createIcons({ root: toast });
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translate(-50%, -20px)';
+            toast.style.transition = 'all 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }, 4000); 
+    }
+
+    function promptBooking(dateStr) {
+        const formattedDate = dateStr.split('-').reverse().join('/');
+        document.getElementById('modal-title').textContent = "Conferma Prenotazione";
+        document.getElementById('modal-desc').innerHTML = `Stai per prenotare uno Smart Working per il <b>${formattedDate}</b>. Procediamo?`;
+        
+        const btn = document.getElementById('modal-confirm-btn');
+        btn.className = "px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all shadow-md shadow-indigo-200 active:scale-95";
+        btn.textContent = "Sì, Prenota";
+        btn.onclick = function() { executeBooking(dateStr); };
+        
+        document.getElementById('action-modal').classList.replace('hidden', 'flex');
+    }
+
+    function promptCancel(dateStr) {
+        const formattedDate = dateStr.split('-').reverse().join('/');
+        document.getElementById('modal-title').textContent = "Cancella Prenotazione";
+        document.getElementById('modal-desc').innerHTML = `Vuoi annullare la tua giornata di Smart Working del <b>${formattedDate}</b>?`;
+        
+        const btn = document.getElementById('modal-confirm-btn');
+        btn.className = "px-5 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all shadow-md shadow-red-200 active:scale-95";
+        btn.textContent = "Sì, Cancella";
+        
+        const myBooking = state.appData.bookings.find(b => String(b.userId) === String(state.currentUser.id) && b.date === dateStr);
+        const targetBackendDate = myBooking ? myBooking._exactBackendDate : dateStr;
+        
+        btn.onclick = function() { executeCancel(targetBackendDate); };
+        
+        document.getElementById('action-modal').classList.replace('hidden', 'flex');
+    }
+
+    function closeModal() {
+        document.getElementById('action-modal').classList.replace('flex', 'hidden');
+    }
+
+    async function executeBooking(dateToProcess) {
+        closeModal();
+        state.isLoading = true; render();
+        try {
+            const res = await callAPI({ action: 'book', userId: state.currentUser.id, date: dateToProcess });
+            if (res.success) { showNotification("Prenotazione confermata!", "success"); await fetchData(); } 
+            else { showNotification(res.error, "error"); }
+        } catch (err) { showNotification("Errore di connessione.", "error"); } 
+        finally { state.isLoading = false; render(); }
+    }
+
+    async function executeCancel(dateToProcess) {
+        closeModal();
+        state.isLoading = true; render();
+        try {
+            const res = await callAPI({ action: 'delete', userId: state.currentUser.id, date: dateToProcess });
+            if (res.success) { showNotification("Prenotazione cancellata.", "success"); await fetchData(); } 
+            else { showNotification(res.error, "error"); }
+        } catch (err) { showNotification("Errore di connessione.", "error"); } 
+        finally { state.isLoading = false; render(); }
+    }
+
+    // ==========================================
+    // UTILS FESTIVITA'
+    // ==========================================
+    function getPasquetta(year) {
+        const f = Math.floor, G = year % 19, C = f(year / 100);
+        const H = (C - f(C / 4) - f((8 * C + 13) / 25) + 19 * G + 15) % 30;
+        const I = H - f(H / 28) * (1 - f(29 / (H + 1)) * f((21 - G) / 11));
+        const J = (year + f(year / 4) + I + 2 - C + f(C / 4)) % 7;
+        const L = I - J, month = 3 + f((L + 40) / 44), day = L + 28 - 31 * f(month / 4);
+        const easter = new Date(year, month - 1, day);
+        easter.setDate(easter.getDate() + 1); 
+        return `${year}-${String(easter.getMonth() + 1).padStart(2, '0')}-${String(easter.getDate()).padStart(2, '0')}`;
+    }
+
+    function isHolidayOrWeekend(dateStr) {
+        const date = new Date(dateStr);
+        const day = date.getDay();
+        if (day === 0 || day === 6) return { is: true, type: 'weekend' }; 
+
+        const mmdd = dateStr.substring(5);
+        const festeFisse = ['01-01', '01-06', '04-25', '05-01', '06-02', '08-15', '11-01', '12-08', '12-25', '12-26'];
+        if (festeFisse.includes(mmdd)) return { is: true, type: 'festivita' };
+        if (dateStr === getPasquetta(date.getFullYear())) return { is: true, type: 'festivita' };
+
+        return { is: false, type: '' };
+    }
+
+    // Fai partire l'app!
+    init();
+
+</script>
 </body>
 </html>
