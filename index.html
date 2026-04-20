@@ -285,10 +285,12 @@
         }
 
         async function executeBooking() {
+            // Salviamo la data prima che closeModal la azzeri!
+            const dateToProcess = actionTargetDate; 
             closeModal();
             setLoading(true);
             try {
-                const res = await callAPI({ action: 'book', userId: currentUser.id, date: actionTargetDate });
+                const res = await callAPI({ action: 'book', userId: currentUser.id, date: dateToProcess });
                 if (res.success) {
                     showAlert("Prenotazione confermata con successo!", "success");
                     await fetchData(); // Ricarica i dati per aggiornare i conteggi
@@ -303,10 +305,12 @@
         }
 
         async function executeCancel() {
+            // Salviamo la data prima che closeModal la azzeri!
+            const dateToProcess = actionTargetDate;
             closeModal();
             setLoading(true);
             try {
-                const res = await callAPI({ action: 'delete', userId: currentUser.id, date: actionTargetDate });
+                const res = await callAPI({ action: 'delete', userId: currentUser.id, date: dateToProcess });
                 if (res.success) {
                     showAlert("Prenotazione cancellata.", "success");
                     await fetchData();
