@@ -144,7 +144,6 @@
         let currentDate = new Date();
         let appData = { bookings: [], floorStats: {} };
         let isLoading = false;
-        let actionTargetDate = null;
 
         // Inizializzazione
         function init() {
@@ -250,7 +249,6 @@
 
         // --- AZIONI PRENOTAZIONE ---
         function promptBooking(dateStr) {
-            actionTargetDate = dateStr;
             const formattedDate = dateStr.split('-').reverse().join('/');
             
             document.getElementById('modal-title').textContent = "Prenota Smart Working";
@@ -259,13 +257,14 @@
             const btn = document.getElementById('modal-confirm-btn');
             btn.className = "px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors";
             btn.textContent = "Conferma Prenotazione";
-            btn.onclick = executeBooking;
+            
+            // Passiamo la data direttamente alla funzione invece di usare variabili globali
+            btn.onclick = function() { executeBooking(dateStr); };
             
             document.getElementById('action-modal').classList.replace('hidden', 'flex');
         }
 
         function promptCancel(dateStr) {
-            actionTargetDate = dateStr;
             const formattedDate = dateStr.split('-').reverse().join('/');
             
             document.getElementById('modal-title').textContent = "Cancella Prenotazione";
@@ -274,19 +273,18 @@
             const btn = document.getElementById('modal-confirm-btn');
             btn.className = "px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors";
             btn.textContent = "Cancella";
-            btn.onclick = executeCancel;
+            
+            // Passiamo la data direttamente alla funzione
+            btn.onclick = function() { executeCancel(dateStr); };
             
             document.getElementById('action-modal').classList.replace('hidden', 'flex');
         }
 
         function closeModal() {
             document.getElementById('action-modal').classList.replace('flex', 'hidden');
-            actionTargetDate = null;
         }
 
-        async function executeBooking() {
-            // Salviamo la data prima che closeModal la azzeri!
-            const dateToProcess = actionTargetDate; 
+        async function executeBooking(dateToProcess) {
             closeModal();
             setLoading(true);
             try {
@@ -304,9 +302,7 @@
             }
         }
 
-        async function executeCancel() {
-            // Salviamo la data prima che closeModal la azzeri!
-            const dateToProcess = actionTargetDate;
+        async function executeCancel(dateToProcess) {
             closeModal();
             setLoading(true);
             try {
